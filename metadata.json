@@ -1,0 +1,5 @@
+{
+  "name": "Vectrude 3D",
+  "description": "A vector-based 3D modeling tool. Draw 2D shapes, extrude them into 3D, perform boolean operations, and use AI to generate geometry.",
+  "requestFramePermissions": []
+}
