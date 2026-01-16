@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { ThreeEvent, useFrame } from '@react-three/fiber';
-import { Edges, TransformControls, Html } from '@react-three/drei';
+import { ThreeEvent, useThree } from '@react-three/fiber';
+import { Edges, TransformControls } from '@react-three/drei';
 import { BaseShape } from '../types';
 import { useStore } from '../store';
 
@@ -14,6 +14,10 @@ const ShapeRenderer: React.FC<ShapeRendererProps> = ({ shape }) => {
   const isSelected = selectedIds.includes(shape.id);
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const { camera, raycaster } = useThree();
+
+  // Drag State for Extrude
+  const dragStart = useRef<{y: number, startDepth: number} | null>(null);
 
   // Geometry Generation
   const geometry = useMemo(() => {
@@ -39,21 +43,17 @@ const ShapeRenderer: React.FC<ShapeRendererProps> = ({ shape }) => {
       for (let i = 1; i < shape.points.length; i++) {
         s.lineTo(shape.points[i][0], shape.points[i][1]);
       }
-      // Auto close
       s.lineTo(shape.points[0][0], shape.points[0][1]);
     }
     
-    if (shape.extrusionDepth > 0) {
-      return new THREE.ExtrudeGeometry(s, {
+    // Always use ExtrudeGeometry, even if depth is 0 (it creates a flat face with depth 0)
+    return new THREE.ExtrudeGeometry(s, {
         depth: shape.extrusionDepth,
         bevelEnabled: false,
-      });
-    } else {
-      return new THREE.ShapeGeometry(s);
-    }
+    });
   }, [shape]);
 
-  // Helper to update position after transform
+  // Handle transformations
   const handleTransformChange = () => {
     if (meshRef.current) {
       const { position, rotation } = meshRef.current;
@@ -63,26 +63,60 @@ const ShapeRenderer: React.FC<ShapeRendererProps> = ({ shape }) => {
       });
     }
   };
-  
-  // Custom shapes are already oriented in world space (Y-up), so we don't need the default rotation.
-  // Standard shapes are drawn on XY and need to be rotated to lie on XZ.
-  const visualRotation = shape.type === 'custom' ? [0, 0, 0] : [Math.PI / 2, 0, 0];
 
+  // Extrude Logic
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    
+    if (mode === 'extrude') {
+        // Start dragging
+        // We project the point onto the screen Y or Camera Plane to determine pull magnitude
+        dragStart.current = { 
+            y: e.clientY, 
+            startDepth: shape.extrusionDepth 
+        };
+        
+        // Capture pointer
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } else if (mode === 'select' || mode === 'edit_vertex') {
+        selectShape(shape.id, e.shiftKey);
+    }
+  };
+
+  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+      if (mode === 'extrude' && dragStart.current) {
+          e.stopPropagation();
+          const deltaY = dragStart.current.y - e.clientY;
+          // Scale factor can be adjusted. 0.05 feels okay for screen pixels to units
+          const newDepth = Math.max(0, dragStart.current.startDepth + deltaY * 0.05);
+          updateShape(shape.id, { extrusionDepth: newDepth });
+      }
+  };
+
+  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
+      if (mode === 'extrude' && dragStart.current) {
+          e.stopPropagation();
+          dragStart.current = null;
+          (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+  };
+
+  // Custom shapes have baked rotation, others have explicit rotation prop
+  // Note: Standard shapes are generated on XY plane by THREE.Shape.
+  // We apply the rotation from the store directly.
+  // The 'view' logic in Viewport calculates the correct starting rotation (e.g. -90 X for ground).
+  
   return (
     <>
       <group position={shape.position} rotation={shape.rotation}>
         <mesh
           ref={meshRef}
           geometry={geometry}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (mode === 'select' || mode === 'edit_vertex') {
-               selectShape(shape.id, e.shiftKey);
-            }
-          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
           onPointerOver={() => setHovered(true)}
           onPointerOut={() => setHovered(false)}
-          rotation={visualRotation as [number, number, number]} 
         >
           <meshStandardMaterial
             color={isSelected ? '#4f46e5' : shape.color}
@@ -90,11 +124,15 @@ const ShapeRenderer: React.FC<ShapeRendererProps> = ({ shape }) => {
             opacity={0.9}
             side={THREE.DoubleSide}
           />
-          <Edges visible={isSelected || hovered} scale={1.0} threshold={15} color={isSelected ? "white" : "black"} />
+          <Edges 
+            visible={isSelected || hovered || mode === 'extrude'} 
+            scale={1.0} 
+            threshold={15} 
+            color={mode === 'extrude' && hovered ? "#fbbf24" : (isSelected ? "white" : "black")} 
+          />
           
-          {/* Render Vertices for Polygons */}
            {mode === 'edit_vertex' && isSelected && shape.type === 'polygon' && (
-              <group rotation={[-Math.PI/2, 0, 0]}> 
+              <group> 
                 {shape.points?.map((pt, i) => (
                   <mesh key={i} position={[pt[0], pt[1], 0]}> 
                     <boxGeometry args={[0.3, 0.3, 0.3]} />
@@ -106,7 +144,6 @@ const ShapeRenderer: React.FC<ShapeRendererProps> = ({ shape }) => {
         </mesh>
       </group>
 
-      {/* Transform Controls */}
       {isSelected && mode === 'select' && meshRef.current && (
         <TransformControls
           object={meshRef.current}

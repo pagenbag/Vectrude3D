@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 export type ShapeType = 'rectangle' | 'circle' | 'polygon' | 'custom';
+export type ViewType = 'perspective' | 'top' | 'front' | 'left';
+export type AppMode = 'select' | 'draw_rect' | 'draw_circle' | 'draw_poly' | 'edit_vertex' | 'extrude';
 
 export interface BaseShape {
   id: string;
@@ -21,7 +23,8 @@ export interface BaseShape {
 export interface AppState {
   shapes: BaseShape[];
   selectedIds: string[];
-  mode: 'select' | 'draw_rect' | 'draw_circle' | 'draw_poly' | 'edit_vertex';
+  mode: AppMode;
+  view: ViewType;
   drawingPoints: [number, number][]; // Temp points for drawing polygon
   isDragging: boolean;
   addShape: (shape: BaseShape) => void;
@@ -29,6 +32,7 @@ export interface AppState {
   removeShape: (id: string) => void;
   selectShape: (id: string, multi: boolean) => void;
   setMode: (mode: AppState['mode']) => void;
+  setView: (view: ViewType) => void;
   addDrawingPoint: (point: [number, number]) => void;
   clearDrawingPoints: () => void;
   performBoolean: (type: 'union' | 'subtract' | 'intersect') => void;

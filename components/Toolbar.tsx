@@ -1,12 +1,14 @@
 import React from 'react';
-import { MousePointer2, Square, Circle, Hexagon, Component, Trash2, Edit3, Combine, Scissors } from 'lucide-react';
+import { MousePointer2, Square, Circle, Hexagon, Trash2, Edit3, Combine, Scissors, ArrowUpFromLine } from 'lucide-react';
 import { useStore } from '../store';
+import { AppMode } from '../types';
 
 const Toolbar: React.FC = () => {
   const { mode, setMode, selectedIds, removeShape, performBoolean } = useStore();
 
-  const tools = [
-    { id: 'select', icon: MousePointer2, label: 'Select' },
+  const tools: { id: AppMode; icon: any; label: string }[] = [
+    { id: 'select', icon: MousePointer2, label: 'Select (Right-click)' },
+    { id: 'extrude', icon: ArrowUpFromLine, label: 'Extrude' },
     { id: 'draw_rect', icon: Square, label: 'Rectangle' },
     { id: 'draw_circle', icon: Circle, label: 'Circle' },
     { id: 'draw_poly', icon: Hexagon, label: 'Polygon' },
@@ -22,7 +24,7 @@ const Toolbar: React.FC = () => {
       {tools.map((tool) => (
         <button
           key={tool.id}
-          onClick={() => setMode(tool.id as any)}
+          onClick={() => setMode(tool.id)}
           className={`p-3 rounded-lg transition-all duration-200 group relative ${
             mode === tool.id
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
@@ -31,7 +33,7 @@ const Toolbar: React.FC = () => {
           title={tool.label}
         >
           <tool.icon size={20} />
-          <span className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-gray-700">
+          <span className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-gray-700 z-50">
             {tool.label}
           </span>
         </button>
@@ -39,7 +41,6 @@ const Toolbar: React.FC = () => {
 
       <div className="h-px bg-gray-700 my-1" />
 
-      {/* Boolean Ops - Visual only for demo layout unless logic implemented */}
       <button
         onClick={() => performBoolean('union')}
         disabled={selectedIds.length < 2}

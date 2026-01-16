@@ -7,6 +7,7 @@ export const useStore = create<AppState>((set, get) => ({
   shapes: [],
   selectedIds: [],
   mode: 'select',
+  view: 'perspective',
   drawingPoints: [],
   isDragging: false,
 
@@ -36,6 +37,8 @@ export const useStore = create<AppState>((set, get) => ({
     }),
 
   setMode: (mode) => set({ mode, drawingPoints: [] }),
+  
+  setView: (view) => set({ view }),
 
   addDrawingPoint: (point) =>
     set((state) => ({ drawingPoints: [...state.drawingPoints, point] })),
@@ -46,8 +49,7 @@ export const useStore = create<AppState>((set, get) => ({
      const state = get();
      const selectedShapes = state.shapes.filter(s => state.selectedIds.includes(s.id));
      
-     // Need at least 2 shapes and maintain order (selection order would be ideal, but currently filter by list order)
-     // To respect selection order, we map selectedIds to shapes
+     // Need at least 2 shapes and maintain order
      const orderedSelection = state.selectedIds
         .map(id => state.shapes.find(s => s.id === id))
         .filter((s): s is BaseShape => !!s);
